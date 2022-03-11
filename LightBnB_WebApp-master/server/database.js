@@ -119,11 +119,84 @@ exports.getAllReservations = getAllReservations;
  * @return {Promise<[{}]>}  A promise to the properties.
  */
 const getAllProperties = function(options, limit = 10) {
+  
+  const queryParams = [];
+  let queryString = `
+  SELECT properties.*, avg(property_reviews.rating) as average_rating
+  FROM properties
+  JOIN property_reviews ON property_id = properties.id
+    `;
+
+    if (options.city) {
+      //let where = 'WHERE ';
+      queryParams.push(`%${options.city}%`);
+      //use indexOf within ${where} to post the number
+      queryString += `WHERE city LIKE $${queryParams.indexOf(`%${options.city}%`) + 1} `;
+    }
+
+    
+      // city,
+      // owner_id,
+      // minimum_price_per_night,
+      // maximum_price_per_night,
+      // minimum_rating
+    
+    //needs condition to see if WHERE exists
+    //if options.city in params, then no extra WHERE
+    if (options.minimum_price_per_night) {
+      queryParams.push(options.minimum_price_per_night);
+      if (!queryParams.includes(`%${options.city}%`)) {
+        //checks if there is already WHERE in statement
+        queryString += `WHERE cost_per_night >= $${queryParams.indexOf(options.minimum_price_per_night) + 1} `;
+      } else {
+        queryString += `AND cost_per_night >= $${queryParams.indexOf(options.minimum_price_per_night) + 1} `;
+      }
+    }
+
+
+    if (options.maximum_price_per_night) {
+      queryParams.push(options.maximum_price_per_night);
+      if (!queryParams.includes(`%${options.city}%`) || !queryParams.includes(options.minimum_price_per_night)) {
+        //checks if there is already WHERE in statement
+        queryString += `WHERE cost_per_night <= $${queryParams.indexOf(options.maximum_price_per_night) + 1} `;
+      } else {
+        queryString += `AND cost_per_night <= $${queryParams.indexOf(options.maximum_price_per_night) + 1} `;
+      }
+    }
+    
+
+
+
+    //add in min rating
+
+    //how do these work together in forming a select?  ie which order
+
+    queryParams.push(limit);
+    queryString += `
+    GROUP BY properties.id
+    ORDER BY cost_per_night
+    LIMIT $${queryParams.indexOf(limit) + 1};
+    `;
+    
+    // let left = `HAVING avg(property_reviews.rating) >= 4
+    //     LIMIT $1;`
+
+
+   // const addToQuery = function(option, sqlAlreadyInUse) {
+    //   //Check to see if either a previous SQL verb is used
+    //   //returns the query ie queryString += function return
+    //   if (queryParams.indexOf(sqlAlreadyInUse) === -1) {
+    //     //checks if there is already WHERE in statement
+    //     return `WHERE cost_per_night >= $${queryParams.indexOf(options.minimum_price_per_night) + 1} `;
+    //   }
+    //   queryParams.push(options.minimum_price_per_night);
+    //   queryString += `AND cost_per_night >= $${queryParams.indexOf(options.minimum_price_per_night) + 1} `;
+    // }
+
+    console.log(queryString, queryParams);
+  
   return pool
-    .query(
-      `SELECT * FROM properties
-      LIMIT $1;`,
-      [limit])
+    .query(queryString, queryParams)
     .then((result) => {
       return result.rows;
     })
