@@ -134,18 +134,21 @@ const getAllProperties = function(options, limit = 10) {
       queryString += `WHERE city LIKE $${queryParams.indexOf(`%${options.city}%`) + 1} `;
     }
 
-    
-      // city,
-      // owner_id,
-      // minimum_price_per_night,
-      // maximum_price_per_night,
-      // minimum_rating
-    
+    if (options.owner_id) {
+      queryParams.push(options.owner_id);
+      queryString = `  SELECT properties.*, avg(property_reviews.rating) as average_rating
+      FROM properties
+      JOIN property_reviews ON property_id = properties.id
+      JOIN users ON owner_id = users.id
+      WHERE users.id = $${queryParams.indexOf(options.owner_id) + 1} `
+    }
+
+   
     //needs condition to see if WHERE exists
     //if options.city in params, then no extra WHERE
     if (options.minimum_price_per_night) {
       queryParams.push(options.minimum_price_per_night);
-      if (!queryParams.includes(`%${options.city}%`)) {
+      if (!queryParams.includes(`%${options.city}%`) || !queryParams.includes(owner_id)) {
         //checks if there is already WHERE in statement
         queryString += `WHERE cost_per_night >= $${queryParams.indexOf(options.minimum_price_per_night) + 1} `;
       } else {
@@ -156,7 +159,7 @@ const getAllProperties = function(options, limit = 10) {
 
     if (options.maximum_price_per_night) {
       queryParams.push(options.maximum_price_per_night);
-      if (!queryParams.includes(`%${options.city}%`) || !queryParams.includes(options.minimum_price_per_night)) {
+      if (!queryParams.includes(`%${options.city}%`) || !queryParams.includes(owner_id) || !queryParams.includes(options.minimum_price_per_night)) {
         //checks if there is already WHERE in statement
         queryString += `WHERE cost_per_night <= $${queryParams.indexOf(options.maximum_price_per_night) + 1} `;
       } else {
@@ -164,23 +167,22 @@ const getAllProperties = function(options, limit = 10) {
       }
     }
     
-
-
+    queryString += `GROUP BY properties.id `
 
     //add in min rating
+    if (options.minimum_rating) {
+      queryParams.push(options.minimum_rating);
+      queryString += `HAVING avg(property_reviews.rating) >= $${queryParams.indexOf(options.minimum_rating) + 1} `;
+    }
 
-    //how do these work together in forming a select?  ie which order
+    //      if (!queryParams.includes(`%${options.city}%`) || !queryParams.includes(options.minimum_price_per_night || !queryParams.includes(options.minimum_price_per_night)) {
 
     queryParams.push(limit);
     queryString += `
-    GROUP BY properties.id
     ORDER BY cost_per_night
     LIMIT $${queryParams.indexOf(limit) + 1};
     `;
     
-    // let left = `HAVING avg(property_reviews.rating) >= 4
-    //     LIMIT $1;`
-
 
    // const addToQuery = function(option, sqlAlreadyInUse) {
     //   //Check to see if either a previous SQL verb is used
